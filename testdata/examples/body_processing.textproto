@@ -1,0 +1,82 @@
+# Body processing test manifest
+#
+# Tests ExtProc body processing scenarios including:
+# - Body modification
+# - Body inspection without modification
+
+name: "body-processing"
+description: "Test request body processing in ExtProc"
+
+test_cases: {
+  name: "body-inspection"
+  description: "Body should be inspected and a header added"
+  tags: ["body"]
+
+  request: {
+    method: "POST"
+    path: "/api/v1/data"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "content-type"
+      value: "application/json"
+    }
+    body: '{"name": "test", "value": 123}'
+    process_request_body: true
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {}
+  }
+
+  expectations: {
+    phase: REQUEST_BODY
+    body_response: {
+      common_response: {
+        status: CONTINUE
+        header_mutation: {
+          set_headers: {
+            key: "x-body-size"
+            value: "30"
+          }
+        }
+      }
+    }
+  }
+}
+
+test_cases: {
+  name: "body-transformation"
+  description: "Body should be transformed by ExtProc"
+  tags: ["body", "transform"]
+
+  request: {
+    method: "POST"
+    path: "/api/v1/transform"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "content-type"
+      value: "application/json"
+    }
+    body: '{"input": "data"}'
+    process_request_body: true
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {}
+  }
+
+  expectations: {
+    phase: REQUEST_BODY
+    body_response: {
+      body: '{"input": "data", "processed": true}'
+      common_response: {
+        status: CONTINUE_AND_REPLACE
+      }
+    }
+  }
+}
+

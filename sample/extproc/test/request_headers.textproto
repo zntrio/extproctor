@@ -1,0 +1,93 @@
+# Request Headers Processing Tests
+#
+# Tests that the ExtProc service correctly adds the
+# x-extproc-processed header during request header processing.
+
+name: "request-headers"
+description: "Test request header processing in the sample ExtProc"
+
+test_cases: {
+  name: "add-extproc-processed-header"
+  description: "Verify ExtProc adds x-extproc-processed header to requests"
+  tags: ["smoke", "headers", "request"]
+
+  request: {
+    method: "GET"
+    path: "/api/v1/users"
+    scheme: "https"
+    authority: "api.example.com"
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-extproc-processed"
+        value: "true"
+      }
+    }
+  }
+}
+
+test_cases: {
+  name: "post-request-with-extproc-header"
+  description: "Verify ExtProc adds header for POST requests"
+  tags: ["headers", "request"]
+
+  request: {
+    method: "POST"
+    path: "/api/v1/data"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "content-type"
+      value: "application/json"
+    }
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-extproc-processed"
+        value: "true"
+      }
+    }
+  }
+}
+
+test_cases: {
+  name: "request-with-existing-headers"
+  description: "Verify ExtProc adds header regardless of existing headers"
+  tags: ["headers", "request"]
+
+  request: {
+    method: "GET"
+    path: "/api/v1/items"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "accept"
+      value: "application/json"
+    }
+    headers: {
+      key: "x-request-id"
+      value: "req-12345"
+    }
+    headers: {
+      key: "x-correlation-id"
+      value: "corr-67890"
+    }
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-extproc-processed"
+        value: "true"
+      }
+    }
+  }
+}
+

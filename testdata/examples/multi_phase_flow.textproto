@@ -1,0 +1,206 @@
+# Multi-phase processing test manifest
+#
+# Tests ExtProc with expectations across multiple phases including:
+# - Request headers processing
+# - Request body inspection
+# - Response headers modification
+# - Response body transformation
+
+name: "multi-phase-flow"
+description: "Test ExtProc processing across all request/response phases"
+
+test_cases: {
+  name: "full-request-response-pipeline"
+  description: "Complete pipeline with expectations in all four main phases"
+  tags: ["multi-phase", "integration"]
+
+  request: {
+    method: "POST"
+    path: "/api/v1/process"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "content-type"
+      value: "application/json"
+    }
+    headers: {
+      key: "x-request-id"
+      value: "req-12345"
+    }
+    body: '{"action": "transform", "payload": "test-data"}'
+    process_request_body: true
+    process_response_headers: true
+    process_response_body: true
+  }
+
+  # Phase 1: Request Headers - Add tracking and validation headers
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-validated"
+        value: "true"
+      }
+      set_headers: {
+        key: "x-processing-started"
+        value: "2025-01-01T00:00:00Z"
+      }
+    }
+  }
+
+  # Phase 2: Request Body - Inspect body and add metadata header
+  expectations: {
+    phase: REQUEST_BODY
+    body_response: {
+      common_response: {
+        status: CONTINUE
+        header_mutation: {
+          set_headers: {
+            key: "x-body-hash"
+            value: "sha256:abc123"
+          }
+        }
+      }
+    }
+  }
+
+  # Phase 3: Response Headers - Add CORS and caching headers
+  expectations: {
+    phase: RESPONSE_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "access-control-allow-origin"
+        value: "*"
+      }
+      set_headers: {
+        key: "cache-control"
+        value: "no-store"
+      }
+      set_headers: {
+        key: "x-processing-completed"
+        value: "2025-01-01T00:00:01Z"
+      }
+    }
+  }
+
+  # Phase 4: Response Body - Wrap response with metadata
+  expectations: {
+    phase: RESPONSE_BODY
+    body_response: {
+      body: '{"success": true, "data": {"result": "processed"}, "meta": {"request_id": "req-12345"}}'
+      common_response: {
+        status: CONTINUE_AND_REPLACE
+      }
+    }
+  }
+}
+
+test_cases: {
+  name: "request-with-trailers"
+  description: "Request processing with trailers in multiple phases"
+  tags: ["multi-phase", "trailers"]
+
+  request: {
+    method: "POST"
+    path: "/api/v1/stream"
+    scheme: "https"
+    authority: "stream.example.com"
+    headers: {
+      key: "content-type"
+      value: "application/octet-stream"
+    }
+    headers: {
+      key: "te"
+      value: "trailers"
+    }
+    body: "chunk1chunk2chunk3"
+    trailers: {
+      key: "x-checksum"
+      value: "abc123"
+    }
+    process_request_body: true
+    process_request_trailers: true
+  }
+
+  # Phase 1: Request Headers - Acknowledge streaming
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-streaming"
+        value: "true"
+      }
+    }
+  }
+
+  # Phase 2: Request Body - Continue processing
+  expectations: {
+    phase: REQUEST_BODY
+    body_response: {
+      common_response: {
+        status: CONTINUE
+        header_mutation: {
+          set_headers: {
+            key: "x-chunk-count"
+            value: "3"
+          }
+        }
+      }
+    }
+  }
+
+  # Phase 3: Request Trailers - Validate checksum
+  expectations: {
+    phase: REQUEST_TRAILERS
+    trailers_response: {
+      set_trailers: {
+        key: "x-checksum-validated"
+        value: "true"
+      }
+    }
+  }
+}
+
+test_cases: {
+  name: "conditional-early-exit"
+  description: "Multi-phase with conditional immediate response on second phase"
+  tags: ["multi-phase", "error", "short-circuit"]
+
+  request: {
+    method: "POST"
+    path: "/api/v1/validate"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "content-type"
+      value: "application/json"
+    }
+    body: '{"invalid": true}'
+    process_request_body: true
+  }
+
+  # Phase 1: Request Headers - Initial processing
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-validation-pending"
+        value: "true"
+      }
+    }
+  }
+
+  # Phase 2: Request Body - Validation fails, return immediate response
+  expectations: {
+    phase: REQUEST_BODY
+    immediate_response: {
+      status_code: 400
+      headers: {
+        key: "content-type"
+        value: "application/json"
+      }
+      body: '{"error": "validation_failed", "message": "Request body is invalid", "field": "invalid"}'
+    }
+  }
+}
+

@@ -1,0 +1,187 @@
+# Full Pipeline Tests
+#
+# Tests the complete request-side ExtProc pipeline with all request phases.
+# Note: Response phases are not simulated by the extproctor client.
+
+name: "full-pipeline"
+description: "Test complete request pipeline in the sample ExtProc"
+
+test_cases: {
+  name: "complete-get-request"
+  description: "Complete GET request with request headers processing"
+  tags: ["integration", "pipeline"]
+
+  request: {
+    method: "GET"
+    path: "/api/v1/complete"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "accept"
+      value: "application/json"
+    }
+    headers: {
+      key: "x-request-id"
+      value: "req-complete-001"
+    }
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-extproc-processed"
+        value: "true"
+      }
+    }
+  }
+}
+
+test_cases: {
+  name: "complete-post-request"
+  description: "Complete POST request with body processing"
+  tags: ["integration", "pipeline", "body"]
+
+  request: {
+    method: "POST"
+    path: "/api/v1/process"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "content-type"
+      value: "application/json"
+    }
+    headers: {
+      key: "x-request-id"
+      value: "req-complete-002"
+    }
+    body: '{"action": "process", "payload": {"id": 123, "name": "test"}}'
+    process_request_body: true
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-extproc-processed"
+        value: "true"
+      }
+    }
+  }
+
+  expectations: {
+    phase: REQUEST_BODY
+    body_response: {
+      common_response: {
+        status: CONTINUE
+      }
+    }
+  }
+}
+
+test_cases: {
+  name: "put-request-flow"
+  description: "PUT request with body processing"
+  tags: ["integration", "pipeline"]
+
+  request: {
+    method: "PUT"
+    path: "/api/v1/items/456"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "content-type"
+      value: "application/json"
+    }
+    headers: {
+      key: "authorization"
+      value: "Bearer test-token"
+    }
+    body: '{"id": 456, "name": "updated-item", "status": "active"}'
+    process_request_body: true
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-extproc-processed"
+        value: "true"
+      }
+    }
+  }
+
+  expectations: {
+    phase: REQUEST_BODY
+    body_response: {
+      common_response: {
+        status: CONTINUE
+      }
+    }
+  }
+}
+
+test_cases: {
+  name: "delete-request-flow"
+  description: "DELETE request with headers processing"
+  tags: ["integration", "pipeline"]
+
+  request: {
+    method: "DELETE"
+    path: "/api/v1/items/789"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "authorization"
+      value: "Bearer admin-token"
+    }
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-extproc-processed"
+        value: "true"
+      }
+    }
+  }
+}
+
+test_cases: {
+  name: "patch-request-flow"
+  description: "PATCH request with partial body"
+  tags: ["integration", "pipeline"]
+
+  request: {
+    method: "PATCH"
+    path: "/api/v1/items/123"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "content-type"
+      value: "application/json-patch+json"
+    }
+    body: '[{"op": "replace", "path": "/status", "value": "updated"}]'
+    process_request_body: true
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-extproc-processed"
+        value: "true"
+      }
+    }
+  }
+
+  expectations: {
+    phase: REQUEST_BODY
+    body_response: {
+      common_response: {
+        status: CONTINUE
+      }
+    }
+  }
+}

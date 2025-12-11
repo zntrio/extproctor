@@ -1,0 +1,108 @@
+# Body Processing Tests
+#
+# Tests that the ExtProc service correctly handles body processing.
+# The sample ExtProc continues processing without body modification.
+
+name: "body-processing"
+description: "Test body processing in the sample ExtProc"
+
+test_cases: {
+  name: "request-body-passthrough"
+  description: "Verify request body is passed through without modification"
+  tags: ["body", "request"]
+
+  request: {
+    method: "POST"
+    path: "/api/v1/data"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "content-type"
+      value: "application/json"
+    }
+    body: '{"name": "test", "value": 123}'
+    process_request_body: true
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-extproc-processed"
+        value: "true"
+      }
+    }
+  }
+
+  expectations: {
+    phase: REQUEST_BODY
+    body_response: {
+      common_response: {
+        status: CONTINUE
+      }
+    }
+  }
+}
+
+test_cases: {
+  name: "request-body-with-response-flags"
+  description: "Verify request body processing with response flags set"
+  tags: ["body", "request"]
+
+  request: {
+    method: "GET"
+    path: "/api/v1/items"
+    scheme: "https"
+    authority: "api.example.com"
+    process_response_headers: true
+    process_response_body: true
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-extproc-processed"
+        value: "true"
+      }
+    }
+  }
+}
+
+test_cases: {
+  name: "large-body-handling"
+  description: "Verify ExtProc handles larger request bodies"
+  tags: ["body", "request"]
+
+  request: {
+    method: "POST"
+    path: "/api/v1/upload"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "content-type"
+      value: "application/json"
+    }
+    body: '{"data": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."}'
+    process_request_body: true
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-extproc-processed"
+        value: "true"
+      }
+    }
+  }
+
+  expectations: {
+    phase: REQUEST_BODY
+    body_response: {
+      common_response: {
+        status: CONTINUE
+      }
+    }
+  }
+}

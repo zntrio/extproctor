@@ -1,0 +1,61 @@
+# Response Headers Processing Tests
+#
+# Note: The extproctor client currently only simulates request-side processing.
+# Response header processing would require actual response flow simulation.
+# These tests verify that request processing works correctly when response
+# processing flags are set.
+
+name: "response-headers"
+description: "Test request processing with response flags enabled"
+
+test_cases: {
+  name: "request-with-response-flags"
+  description: "Verify request headers processed when response flags are set"
+  tags: ["smoke", "headers", "request"]
+
+  request: {
+    method: "GET"
+    path: "/api/v1/users"
+    scheme: "https"
+    authority: "api.example.com"
+    process_response_headers: true
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-extproc-processed"
+        value: "true"
+      }
+    }
+  }
+}
+
+test_cases: {
+  name: "post-request-with-response-flags"
+  description: "Verify POST request headers processed with response flags"
+  tags: ["headers", "request"]
+
+  request: {
+    method: "POST"
+    path: "/api/v1/submit"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "content-type"
+      value: "application/json"
+    }
+    process_response_headers: true
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-extproc-processed"
+        value: "true"
+      }
+    }
+  }
+}

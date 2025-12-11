@@ -1,0 +1,206 @@
+// SPDX-FileCopyrightText: 2025 Thibault NORMAND
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package extproctor.v1;
+
+option go_package = "zntr.io/extproctor/gen/extproctor/v1;extproctorv1";
+
+// TestManifest contains a collection of test cases to run against an ExtProc service.
+message TestManifest {
+  // Metadata about the manifest
+  string name = 1;
+  string description = 2;
+
+  // Test cases to execute
+  repeated TestCase test_cases = 3;
+}
+
+// TestCase defines a single test scenario for an ExtProc service.
+message TestCase {
+  // Unique name for the test case
+  string name = 1;
+
+  // Human-readable description of what the test validates
+  string description = 2;
+
+  // Tags for filtering and grouping tests
+  repeated string tags = 3;
+
+  // The HTTP request that triggers the ExtProc flow
+  HttpRequest request = 4;
+
+  // Expected ExtProc responses (unordered matching - all must be satisfied)
+  repeated ExtProcExpectation expectations = 5;
+
+  // Optional: path to golden file for expected responses
+  string golden_file = 6;
+}
+
+// HttpRequest defines the HTTP request that will be processed by the ExtProc service.
+message HttpRequest {
+  // HTTP method (GET, POST, PUT, DELETE, etc.)
+  string method = 1;
+
+  // Request path (e.g., /api/v1/users)
+  string path = 2;
+
+  // Scheme (http or https)
+  string scheme = 3;
+
+  // Authority/Host header
+  string authority = 4;
+
+  // Request headers
+  map<string, string> headers = 5;
+
+  // Request body (for POST, PUT, etc.)
+  bytes body = 6;
+
+  // Request trailers
+  map<string, string> trailers = 7;
+
+  // Whether to send request body to ExtProc
+  bool process_request_body = 8;
+
+  // Whether to send request trailers to ExtProc
+  bool process_request_trailers = 9;
+
+  // Whether to process response headers
+  bool process_response_headers = 10;
+
+  // Whether to process response body
+  bool process_response_body = 11;
+
+  // Whether to process response trailers
+  bool process_response_trailers = 12;
+}
+
+// ExtProcExpectation defines an expected response from the ExtProc service.
+message ExtProcExpectation {
+  // The phase this expectation applies to
+  ProcessingPhase phase = 1;
+
+  // The expected response for this phase
+  oneof response {
+    HeadersExpectation headers_response = 2;
+    BodyExpectation body_response = 3;
+    TrailersExpectation trailers_response = 4;
+    ImmediateExpectation immediate_response = 5;
+  }
+}
+
+// ProcessingPhase indicates which phase of request/response processing the expectation applies to.
+enum ProcessingPhase {
+  PROCESSING_PHASE_UNSPECIFIED = 0;
+  REQUEST_HEADERS = 1;
+  REQUEST_BODY = 2;
+  REQUEST_TRAILERS = 3;
+  RESPONSE_HEADERS = 4;
+  RESPONSE_BODY = 5;
+  RESPONSE_TRAILERS = 6;
+}
+
+// HeadersExpectation defines expected header mutations.
+message HeadersExpectation {
+  // Headers to add or set
+  map<string, string> set_headers = 1;
+
+  // Headers to remove
+  repeated string remove_headers = 2;
+
+  // Headers to append
+  map<string, string> append_headers = 3;
+
+  // Expected response status (for immediate responses)
+  CommonResponse common_response = 4;
+}
+
+// BodyExpectation defines expected body mutations.
+message BodyExpectation {
+  // Replace body with this content
+  bytes body = 1;
+
+  // Clear the body entirely
+  bool clear_body = 2;
+
+  // Common response settings
+  CommonResponse common_response = 3;
+}
+
+// TrailersExpectation defines expected trailer mutations.
+message TrailersExpectation {
+  // Trailers to set
+  map<string, string> set_trailers = 1;
+
+  // Trailers to remove
+  repeated string remove_trailers = 2;
+}
+
+// ImmediateExpectation defines an expected immediate response (short-circuit).
+message ImmediateExpectation {
+  // HTTP status code for the immediate response
+  int32 status_code = 1;
+
+  // Headers to include in the immediate response
+  map<string, string> headers = 2;
+
+  // Body of the immediate response
+  bytes body = 3;
+
+  // gRPC status (if applicable)
+  GrpcStatus grpc_status = 4;
+
+  // Details message for the response
+  string details = 5;
+}
+
+// CommonResponse contains fields common to multiple response types.
+message CommonResponse {
+  // Status of the processing
+  CommonResponseStatus status = 1;
+
+  // Header mutations
+  HeaderMutation header_mutation = 2;
+
+  // Body mutations
+  BodyMutation body_mutation = 3;
+
+  // Clear the route cache
+  bool clear_route_cache = 4;
+}
+
+// CommonResponseStatus indicates the status of common response processing.
+enum CommonResponseStatus {
+  COMMON_RESPONSE_STATUS_UNSPECIFIED = 0;
+  CONTINUE = 1;
+  CONTINUE_AND_REPLACE = 2;
+}
+
+// HeaderMutation describes mutations to apply to headers.
+message HeaderMutation {
+  // Headers to set (replaces if exists)
+  map<string, string> set_headers = 1;
+
+  // Headers to remove
+  repeated string remove_headers = 2;
+
+  // Headers to append
+  map<string, string> append_headers = 3;
+}
+
+// BodyMutation describes mutations to apply to the body.
+message BodyMutation {
+  // Replace body with this value
+  bytes body = 1;
+
+  // Clear the body
+  bool clear_body = 2;
+}
+
+// GrpcStatus represents gRPC status information.
+message GrpcStatus {
+  // gRPC status code
+  int32 status = 1;
+}

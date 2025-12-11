@@ -1,0 +1,93 @@
+# Authentication flow test manifest
+#
+# Tests ExtProc authentication scenarios including:
+# - Valid authentication passing through
+# - Invalid authentication being rejected with immediate response
+
+name: "auth-flow"
+description: "Test authentication handling in ExtProc"
+
+test_cases: {
+  name: "valid-auth-passthrough"
+  description: "Valid authentication should pass through with additional headers"
+  tags: ["auth", "smoke"]
+
+  request: {
+    method: "GET"
+    path: "/api/v1/protected"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "authorization"
+      value: "Bearer valid-token-123"
+    }
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-user-id"
+        value: "user-123"
+      }
+      set_headers: {
+        key: "x-auth-validated"
+        value: "true"
+      }
+    }
+  }
+}
+
+test_cases: {
+  name: "invalid-auth-rejection"
+  description: "Invalid authentication should return 401 immediate response"
+  tags: ["auth", "error"]
+
+  request: {
+    method: "GET"
+    path: "/api/v1/protected"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "authorization"
+      value: "Bearer invalid-token"
+    }
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    immediate_response: {
+      status_code: 401
+      headers: {
+        key: "content-type"
+        value: "application/json"
+      }
+      body: '{"error": "unauthorized", "message": "Invalid token"}'
+    }
+  }
+}
+
+test_cases: {
+  name: "missing-auth-rejection"
+  description: "Missing authentication should return 401 immediate response"
+  tags: ["auth", "error"]
+
+  request: {
+    method: "GET"
+    path: "/api/v1/protected"
+    scheme: "https"
+    authority: "api.example.com"
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    immediate_response: {
+      status_code: 401
+      headers: {
+        key: "www-authenticate"
+        value: "Bearer"
+      }
+    }
+  }
+}
+

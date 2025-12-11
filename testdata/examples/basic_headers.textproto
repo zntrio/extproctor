@@ -1,0 +1,64 @@
+# Basic test manifest demonstrating header processing
+#
+# This manifest tests that an ExtProc service:
+# 1. Receives request headers
+# 2. Adds a custom header to the request
+
+name: "basic-headers"
+description: "Test basic request header processing"
+
+test_cases: {
+  name: "add-custom-header"
+  description: "Verify that the ExtProc adds a custom header"
+  tags: ["smoke", "headers"]
+
+  request: {
+    method: "GET"
+    path: "/api/v1/users"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "content-type"
+      value: "application/json"
+    }
+    headers: {
+      key: "accept"
+      value: "application/json"
+    }
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-processed-by"
+        value: "extproc"
+      }
+    }
+  }
+}
+
+test_cases: {
+  name: "remove-sensitive-header"
+  description: "Verify that the ExtProc removes a sensitive header"
+  tags: ["security", "headers"]
+
+  request: {
+    method: "GET"
+    path: "/api/v1/secure"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "x-internal-token"
+      value: "secret123"
+    }
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      remove_headers: "x-internal-token"
+    }
+  }
+}
+
