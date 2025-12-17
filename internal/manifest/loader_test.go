@@ -4,6 +4,7 @@
 package manifest
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -371,4 +372,39 @@ test_cases: {
 	require.NoError(t, err)
 	assert.Len(t, manifests, 1)
 	assert.Equal(t, manifestPath, manifests[0].SourcePath)
+}
+
+func TestLoader_LoadFile_LargeFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	manifestPath := filepath.Join(tmpDir, "large.textproto")
+
+	// Create a file with many test cases but still under the 1MB limit
+	content := `name: "large-manifest"
+`
+	for i := 0; i < 100; i++ {
+		content += fmt.Sprintf(`
+test_cases: {
+  name: "test-%d"
+  request: { method: "GET", path: "/test-%d" }
+  expectations: { phase: REQUEST_HEADERS, headers_response: {} }
+}
+`, i, i)
+	}
+
+	err := os.WriteFile(manifestPath, []byte(content), 0o644)
+	require.NoError(t, err)
+
+	loader := NewLoader()
+	manifest, err := loader.LoadFile(manifestPath)
+	require.NoError(t, err)
+	assert.Len(t, manifest.TestCases, 100)
+}
+
+func TestLoader_LoadDirectory_EmptyDirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	loader := NewLoader()
+	manifests, err := loader.LoadPath(tmpDir)
+	require.NoError(t, err)
+	assert.Empty(t, manifests)
 }

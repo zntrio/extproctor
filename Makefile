@@ -3,7 +3,7 @@ BINARY_NAME := extproctor
 MODULE := zntr.io/extproctor
 GO := go
 GOFLAGS := -trimpath
-LDFLAGS := -s -w -buildid=
+LDFLAGS := -s -w -buildid=$(shell git rev-parse HEAD)
 
 # Tools
 GOFMT := gofmt
