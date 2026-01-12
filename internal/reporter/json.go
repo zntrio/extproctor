@@ -5,6 +5,7 @@ package reporter
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"time"
 
@@ -29,6 +30,18 @@ type jsonTest struct {
 	Duration    string           `json:"duration"`
 	Error       string           `json:"error,omitempty"`
 	Differences []jsonDifference `json:"differences,omitempty"`
+	Unmatched   []jsonUnmatched  `json:"unmatched,omitempty"`
+	Unexpected  []jsonUnexpected `json:"unexpected,omitempty"`
+}
+
+type jsonUnmatched struct {
+	Phase        string `json:"phase"`
+	ResponseType string `json:"response_type"`
+}
+
+type jsonUnexpected struct {
+	Phase        string `json:"phase"`
+	ResponseType string `json:"response_type"`
 }
 
 type jsonDifference struct {
@@ -95,6 +108,20 @@ func (r *JSONReporter) EndTest(result TestResult) {
 		})
 	}
 
+	for _, u := range result.Unmatched {
+		test.Unmatched = append(test.Unmatched, jsonUnmatched{
+			Phase:        u.Phase.String(),
+			ResponseType: formatResponseType(u.Response),
+		})
+	}
+
+	for _, u := range result.Unexpected {
+		test.Unexpected = append(test.Unexpected, jsonUnexpected{
+			Phase:        u.Phase.String(),
+			ResponseType: formatResponseType(u.Response.Response),
+		})
+	}
+
 	r.results.Tests = append(r.results.Tests, test)
 }
 
@@ -121,4 +148,9 @@ func FormatDifference(d comparator.Difference) jsonDifference {
 		Expected: d.Expected,
 		Actual:   d.Actual,
 	}
+}
+
+// formatResponseType returns a human-readable type name for a response.
+func formatResponseType(resp any) string {
+	return fmt.Sprintf("%T", resp)
 }

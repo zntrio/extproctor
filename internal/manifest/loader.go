@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"google.golang.org/protobuf/encoding/prototext"
-
 	extproctorv1 "zntr.io/extproctor/gen/extproctor/v1"
 )
 

@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-
 	"zntr.io/extproctor/internal/comparator"
 )
 
@@ -94,6 +93,13 @@ func (r *HumanReporter) EndTest(result TestResult) {
 			_, _ = fmt.Fprintln(r.out, "    Unmatched expectations:")
 			for _, exp := range result.Unmatched {
 				_, _ = fmt.Fprintf(r.out, "      - Phase: %s, Type: %T\n", exp.Phase, exp.Response)
+			}
+		}
+
+		if len(result.Unexpected) > 0 {
+			_, _ = fmt.Fprintln(r.out, "    Unexpected responses (not matched by any expectation):")
+			for _, resp := range result.Unexpected {
+				_, _ = fmt.Fprintf(r.out, "      - Phase: %s, Type: %T\n", resp.Phase, resp.Response.Response)
 			}
 		}
 	}

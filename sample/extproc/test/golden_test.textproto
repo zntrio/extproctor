@@ -1,0 +1,108 @@
+# Golden Tests
+#
+# Demonstrates using golden files for test expectations instead of
+# inline expectations. Golden files are useful when:
+# - Expectations are complex or verbose
+# - You want to snapshot actual server responses
+# - Tests are updated frequently as the ExtProc evolves
+#
+# Use `extproctor run --update-golden` to regenerate golden files
+# from actual server responses.
+
+name: "golden-tests"
+description: "Test ExtProc using golden file expectations"
+
+# Test case using a golden file for expectations
+test_cases: {
+  name: "request-headers-golden"
+  description: "Verify request header processing using golden file"
+  tags: ["golden", "headers", "request"]
+
+  request: {
+    method: "GET"
+    path: "/api/v1/products"
+    scheme: "https"
+    authority: "shop.example.com"
+    headers: {
+      key: "accept"
+      value: "application/json"
+    }
+    headers: {
+      key: "x-correlation-id"
+      value: "golden-001"
+    }
+  }
+
+  golden_file: "golden/request_headers.golden"
+}
+
+# Test case for POST with body, using golden file
+test_cases: {
+  name: "post-with-body-golden"
+  description: "Verify POST request with body using golden file"
+  tags: ["golden", "headers", "body"]
+
+  request: {
+    method: "POST"
+    path: "/api/v1/orders"
+    scheme: "https"
+    authority: "shop.example.com"
+    headers: {
+      key: "content-type"
+      value: "application/json"
+    }
+    headers: {
+      key: "x-correlation-id"
+      value: "golden-002"
+    }
+    body: '{"product_id": "prod-123", "quantity": 2}'
+    process_request_body: true
+  }
+
+  golden_file: "golden/post_with_body.golden"
+}
+
+# Test case for response headers, using golden file
+test_cases: {
+  name: "response-headers-golden"
+  description: "Verify response header processing using golden file"
+  tags: ["golden", "headers", "response"]
+
+  request: {
+    method: "GET"
+    path: "/api/v1/health"
+    scheme: "https"
+    authority: "shop.example.com"
+    process_response_headers: true
+  }
+
+  golden_file: "golden/response_headers.golden"
+}
+
+# Mixed test: some expectations inline, complex ones in golden file
+test_cases: {
+  name: "full-flow-golden"
+  description: "Full request flow with golden file expectations"
+  tags: ["golden", "integration"]
+
+  request: {
+    method: "PUT"
+    path: "/api/v1/inventory/item-456"
+    scheme: "https"
+    authority: "shop.example.com"
+    headers: {
+      key: "content-type"
+      value: "application/json"
+    }
+    headers: {
+      key: "authorization"
+      value: "Bearer test-token-xyz"
+    }
+    body: '{"stock": 100, "reserved": 5}'
+    process_request_body: true
+    process_response_headers: true
+  }
+
+  golden_file: "golden/full_flow.golden"
+}
+

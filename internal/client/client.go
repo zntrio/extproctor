@@ -15,7 +15,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
-
 	extproctorv1 "zntr.io/extproctor/gen/extproctor/v1"
 )
 
@@ -220,6 +219,65 @@ func (c *Client) Process(ctx context.Context, req *extproctorv1.HttpRequest) (*P
 		})
 	}
 
+	// Send response headers if configured
+	if req.ProcessResponseHeaders {
+		respHeadersReq := buildResponseHeaders(req)
+		if err := stream.Send(respHeadersReq); err != nil {
+			return nil, fmt.Errorf("failed to send response headers: %w", err)
+		}
+
+		resp, err := stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("failed to receive response for response headers: %w", err)
+		}
+		result.Responses = append(result.Responses, &PhaseResponse{
+			Phase:    extproctorv1.ProcessingPhase_RESPONSE_HEADERS,
+			Response: resp,
+		})
+
+		if isImmediateResponse(resp) {
+			return result, stream.CloseSend()
+		}
+	}
+
+	// Send response body if configured
+	if req.ProcessResponseBody {
+		respBodyReq := buildResponseBody(req)
+		if err := stream.Send(respBodyReq); err != nil {
+			return nil, fmt.Errorf("failed to send response body: %w", err)
+		}
+
+		resp, err := stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("failed to receive response for response body: %w", err)
+		}
+		result.Responses = append(result.Responses, &PhaseResponse{
+			Phase:    extproctorv1.ProcessingPhase_RESPONSE_BODY,
+			Response: resp,
+		})
+
+		if isImmediateResponse(resp) {
+			return result, stream.CloseSend()
+		}
+	}
+
+	// Send response trailers if configured
+	if req.ProcessResponseTrailers {
+		respTrailersReq := buildResponseTrailers(req)
+		if err := stream.Send(respTrailersReq); err != nil {
+			return nil, fmt.Errorf("failed to send response trailers: %w", err)
+		}
+
+		resp, err := stream.Recv()
+		if err != nil {
+			return nil, fmt.Errorf("failed to receive response for response trailers: %w", err)
+		}
+		result.Responses = append(result.Responses, &PhaseResponse{
+			Phase:    extproctorv1.ProcessingPhase_RESPONSE_TRAILERS,
+			Response: resp,
+		})
+	}
+
 	return result, stream.CloseSend()
 }
 
@@ -285,6 +343,58 @@ func buildRequestTrailers(req *extproctorv1.HttpRequest) *extprocv3.ProcessingRe
 	return &extprocv3.ProcessingRequest{
 		Request: &extprocv3.ProcessingRequest_RequestTrailers{
 			RequestTrailers: &extprocv3.HttpTrailers{
+				Trailers: &corev3.HeaderMap{
+					Headers: trailers,
+				},
+			},
+		},
+	}
+}
+
+// buildResponseHeaders creates a ProcessingRequest for response headers.
+func buildResponseHeaders(req *extproctorv1.HttpRequest) *extprocv3.ProcessingRequest {
+	// Simulate response headers from upstream
+	headers := []*corev3.HeaderValue{
+		{Key: ":status", Value: "200"},
+		{Key: "content-type", Value: "application/json"},
+	}
+
+	return &extprocv3.ProcessingRequest{
+		Request: &extprocv3.ProcessingRequest_ResponseHeaders{
+			ResponseHeaders: &extprocv3.HttpHeaders{
+				Headers: &corev3.HeaderMap{
+					Headers: headers,
+				},
+				EndOfStream: !req.ProcessResponseBody && !req.ProcessResponseTrailers,
+			},
+		},
+	}
+}
+
+// buildResponseBody creates a ProcessingRequest for the response body.
+func buildResponseBody(req *extproctorv1.HttpRequest) *extprocv3.ProcessingRequest {
+	// Simulate response body from upstream
+	return &extprocv3.ProcessingRequest{
+		Request: &extprocv3.ProcessingRequest_ResponseBody{
+			ResponseBody: &extprocv3.HttpBody{
+				Body:        []byte(`{"status":"ok"}`),
+				EndOfStream: !req.ProcessResponseTrailers,
+			},
+		},
+	}
+}
+
+// buildResponseTrailers creates a ProcessingRequest for response trailers.
+func buildResponseTrailers(req *extproctorv1.HttpRequest) *extprocv3.ProcessingRequest {
+	// Simulate response trailers from upstream (common in gRPC)
+	trailers := []*corev3.HeaderValue{
+		{Key: "grpc-status", Value: "0"},
+		{Key: "grpc-message", Value: "OK"},
+	}
+
+	return &extprocv3.ProcessingRequest{
+		Request: &extprocv3.ProcessingRequest_ResponseTrailers{
+			ResponseTrailers: &extprocv3.HttpTrailers{
 				Trailers: &corev3.HeaderMap{
 					Headers: trailers,
 				},

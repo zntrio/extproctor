@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
 	extproctorv1 "zntr.io/extproctor/gen/extproctor/v1"
 )
 

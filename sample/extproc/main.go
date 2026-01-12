@@ -64,10 +64,14 @@ func (s *ExtProcServer) processRequest(req *extprocv3.ProcessingRequest) (*extpr
 		return s.handleRequestHeaders(v.RequestHeaders)
 	case *extprocv3.ProcessingRequest_RequestBody:
 		return s.handleRequestBody(v.RequestBody)
+	case *extprocv3.ProcessingRequest_RequestTrailers:
+		return s.handleRequestTrailers(v.RequestTrailers)
 	case *extprocv3.ProcessingRequest_ResponseHeaders:
 		return s.handleResponseHeaders(v.ResponseHeaders)
 	case *extprocv3.ProcessingRequest_ResponseBody:
 		return s.handleResponseBody(v.ResponseBody)
+	case *extprocv3.ProcessingRequest_ResponseTrailers:
+		return s.handleResponseTrailers(v.ResponseTrailers)
 	default:
 		// For unhandled message types, continue processing without modifications
 		return &extprocv3.ProcessingResponse{}, nil
@@ -121,6 +125,29 @@ func (s *ExtProcServer) handleRequestBody(body *extprocv3.HttpBody) (*extprocv3.
 	}, nil
 }
 
+// handleRequestTrailers processes incoming request trailers.
+// This is called when trailer processing is enabled and the request includes trailers.
+func (s *ExtProcServer) handleRequestTrailers(trailers *extprocv3.HttpTrailers) (*extprocv3.ProcessingResponse, error) {
+	log.Printf("Processing request trailers")
+
+	return &extprocv3.ProcessingResponse{
+		Response: &extprocv3.ProcessingResponse_RequestTrailers{
+			RequestTrailers: &extprocv3.TrailersResponse{
+				HeaderMutation: &extprocv3.HeaderMutation{
+					SetHeaders: []*corev3.HeaderValueOption{
+						{
+							Header: &corev3.HeaderValue{
+								Key:   "x-extproc-request-trailer",
+								Value: "processed",
+							},
+						},
+					},
+				},
+			},
+		},
+	}, nil
+}
+
 // handleResponseHeaders processes outgoing response headers.
 // This is where you can inspect, modify, or add headers to the response.
 func (s *ExtProcServer) handleResponseHeaders(headers *extprocv3.HttpHeaders) (*extprocv3.ProcessingResponse, error) {
@@ -160,6 +187,30 @@ func (s *ExtProcServer) handleResponseBody(body *extprocv3.HttpBody) (*extprocv3
 			ResponseBody: &extprocv3.BodyResponse{
 				Response: &extprocv3.CommonResponse{
 					Status: extprocv3.CommonResponse_CONTINUE,
+				},
+			},
+		},
+	}, nil
+}
+
+// handleResponseTrailers processes outgoing response trailers.
+// This is called when trailer processing is enabled and the response includes trailers.
+// Response trailers are commonly used for gRPC status, checksums, or post-body metadata.
+func (s *ExtProcServer) handleResponseTrailers(trailers *extprocv3.HttpTrailers) (*extprocv3.ProcessingResponse, error) {
+	log.Printf("Processing response trailers")
+
+	return &extprocv3.ProcessingResponse{
+		Response: &extprocv3.ProcessingResponse_ResponseTrailers{
+			ResponseTrailers: &extprocv3.TrailersResponse{
+				HeaderMutation: &extprocv3.HeaderMutation{
+					SetHeaders: []*corev3.HeaderValueOption{
+						{
+							Header: &corev3.HeaderValue{
+								Key:   "x-extproc-trailer",
+								Value: "processed",
+							},
+						},
+					},
 				},
 			},
 		},

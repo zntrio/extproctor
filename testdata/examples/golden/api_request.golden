@@ -1,0 +1,18 @@
+# Golden file for api-request-with-golden test
+#
+# This file captures the expected ExtProc response for an authenticated
+# API request. The ExtProc should add processing metadata headers.
+#
+# To regenerate: extproctor run testdata/examples/ --update-golden
+
+name: "golden"
+expectations: {
+  phase: REQUEST_HEADERS
+  headers_response: {
+    set_headers: {
+      key: "x-processed"
+      value: "true"
+    }
+  }
+}
+

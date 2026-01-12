@@ -109,6 +109,7 @@ type TestResult struct {
 	Error       error
 	Differences []comparator.Difference
 	Unmatched   []*extproctorv1.ExtProcExpectation
+	Unexpected  []*client.PhaseResponse
 }
 
 // Run executes all test cases from the loaded manifests.
@@ -260,6 +261,7 @@ func (r *Runner) runTest(ctx context.Context, tc *testCaseWithManifest) *TestRes
 	result.Passed = compResult.Passed
 	result.Differences = compResult.Differences
 	result.Unmatched = compResult.Unmatched
+	result.Unexpected = compResult.Unexpected
 	result.Duration = time.Since(startTime)
 
 	r.reportResult(result)
@@ -299,6 +301,7 @@ func (r *Runner) reportResult(result *TestResult) {
 			Error:       result.Error,
 			Differences: result.Differences,
 			Unmatched:   result.Unmatched,
+			Unexpected:  result.Unexpected,
 		})
 	}
 }

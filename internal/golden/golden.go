@@ -8,12 +8,28 @@ import (
 	"os"
 	"path/filepath"
 
+	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	extprocv3 "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	"google.golang.org/protobuf/encoding/prototext"
-
 	extproctorv1 "zntr.io/extproctor/gen/extproctor/v1"
 	"zntr.io/extproctor/internal/client"
 )
+
+// getHeaderValue extracts the value from a HeaderValue, supporting both
+// Value (string) and RawValue (bytes) fields per Envoy's protobuf definition.
+func getHeaderValue(h *corev3.HeaderValue) string {
+	if h == nil {
+		return ""
+	}
+	// Prefer Value if set, otherwise use RawValue
+	if h.Value != "" {
+		return h.Value
+	}
+	if len(h.RawValue) > 0 {
+		return string(h.RawValue)
+	}
+	return ""
+}
 
 // Write writes the processing result as a golden file.
 func Write(path string, result *client.ProcessingResult) error {
@@ -109,7 +125,7 @@ func convertEnvoyHeadersResponse(resp *extprocv3.CommonResponse) *extproctorv1.E
 		headersExp.SetHeaders = make(map[string]string)
 		for _, h := range resp.HeaderMutation.SetHeaders {
 			if h.Header != nil {
-				headersExp.SetHeaders[h.Header.Key] = h.Header.Value
+				headersExp.SetHeaders[h.Header.Key] = getHeaderValue(h.Header)
 			}
 		}
 		headersExp.RemoveHeaders = resp.HeaderMutation.RemoveHeaders
@@ -148,7 +164,7 @@ func convertEnvoyTrailersResponse(resp *extprocv3.TrailersResponse) *extproctorv
 		trailersExp.SetTrailers = make(map[string]string)
 		for _, h := range resp.HeaderMutation.SetHeaders {
 			if h.Header != nil {
-				trailersExp.SetTrailers[h.Header.Key] = h.Header.Value
+				trailersExp.SetTrailers[h.Header.Key] = getHeaderValue(h.Header)
 			}
 		}
 		trailersExp.RemoveTrailers = resp.HeaderMutation.RemoveHeaders
@@ -174,7 +190,7 @@ func convertEnvoyImmediateResponse(resp *extprocv3.ImmediateResponse) *extprocto
 			immExp.Headers = make(map[string]string)
 			for _, h := range resp.Headers.SetHeaders {
 				if h.Header != nil {
-					immExp.Headers[h.Header.Key] = h.Header.Value
+					immExp.Headers[h.Header.Key] = getHeaderValue(h.Header)
 				}
 			}
 		}

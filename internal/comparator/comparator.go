@@ -7,11 +7,27 @@ import (
 	"fmt"
 	"strings"
 
+	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	extprocv3 "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
-
 	extproctorv1 "zntr.io/extproctor/gen/extproctor/v1"
 	"zntr.io/extproctor/internal/client"
 )
+
+// getHeaderValue extracts the value from a HeaderValue, supporting both
+// Value (string) and RawValue (bytes) fields per Envoy's protobuf definition.
+func getHeaderValue(h *corev3.HeaderValue) string {
+	if h == nil {
+		return ""
+	}
+	// Prefer Value if set, otherwise use RawValue
+	if h.Value != "" {
+		return h.Value
+	}
+	if len(h.RawValue) > 0 {
+		return string(h.RawValue)
+	}
+	return ""
+}
 
 // ComparisonResult contains the result of comparing expected vs actual responses.
 type ComparisonResult struct {
@@ -19,6 +35,7 @@ type ComparisonResult struct {
 	Differences []Difference
 	Matched     []*MatchedExpectation
 	Unmatched   []*extproctorv1.ExtProcExpectation
+	Unexpected  []*client.PhaseResponse
 }
 
 // MatchedExpectation represents an expectation that was matched.
@@ -44,20 +61,39 @@ func New() *Comparator {
 }
 
 // Compare compares expectations against actual responses using unordered matching.
-// All expectations must be satisfied by some response.
+// All expectations must be satisfied by some response for the comparison to pass.
 func (c *Comparator) Compare(expectations []*extproctorv1.ExtProcExpectation, result *client.ProcessingResult) *ComparisonResult {
 	cr := &ComparisonResult{
 		Passed: true,
 	}
 
-	// Track which expectations have been matched
-	matchedExpectations := make(map[int]bool)
+	// Fail if there are no expectations but there are responses
+	if len(expectations) == 0 && len(result.Responses) > 0 {
+		cr.Passed = false
+		cr.Differences = append(cr.Differences, Difference{
+			Path:     "expectations",
+			Expected: "at least one expectation",
+			Actual:   "no expectations defined",
+		})
+		// Mark all responses as unexpected
+		cr.Unexpected = append(cr.Unexpected, result.Responses...)
+		return cr
+	}
+
+	// Track which responses have been matched
+	matchedResponses := make(map[int]bool)
 
 	// Try to match each expectation with a response
-	for i, exp := range expectations {
+	for _, exp := range expectations {
 		matched := false
+		var bestDiffs []Difference
 
-		for _, resp := range result.Responses {
+		for j, resp := range result.Responses {
+			// Skip already matched responses
+			if matchedResponses[j] {
+				continue
+			}
+
 			// Phase must match
 			if resp.Phase != exp.Phase {
 				continue
@@ -68,21 +104,34 @@ func (c *Comparator) Compare(expectations []*extproctorv1.ExtProcExpectation, re
 			if len(diffs) == 0 {
 				// Match found
 				matched = true
-				matchedExpectations[i] = true
+				matchedResponses[j] = true
 				cr.Matched = append(cr.Matched, &MatchedExpectation{
 					Expectation: exp,
 					Response:    resp,
 				})
 				break
 			} else {
-				// Record differences but continue looking for a match
-				cr.Differences = append(cr.Differences, diffs...)
+				// Keep track of best match attempt (fewest differences)
+				if bestDiffs == nil || len(diffs) < len(bestDiffs) {
+					bestDiffs = diffs
+				}
 			}
 		}
 
 		if !matched {
 			cr.Unmatched = append(cr.Unmatched, exp)
 			cr.Passed = false
+			// Only record differences from the best match attempt
+			if bestDiffs != nil {
+				cr.Differences = append(cr.Differences, bestDiffs...)
+			}
+		}
+	}
+
+	// Track responses that weren't matched by any expectation
+	for j, resp := range result.Responses {
+		if !matchedResponses[j] {
+			cr.Unexpected = append(cr.Unexpected, resp)
 		}
 	}
 
@@ -166,12 +215,13 @@ func (c *Comparator) compareHeaderMutation(phase extproctorv1.ProcessingPhase, e
 		for _, h := range resp.HeaderMutation.SetHeaders {
 			if h.Header != nil && h.Header.Key == k {
 				found = true
-				if h.Header.Value != v {
+				actualValue := getHeaderValue(h.Header)
+				if actualValue != v {
 					diffs = append(diffs, Difference{
 						Phase:    phase,
 						Path:     fmt.Sprintf("header_mutation.set_headers[%s]", k),
 						Expected: v,
-						Actual:   h.Header.Value,
+						Actual:   actualValue,
 					})
 				}
 				break
@@ -230,12 +280,13 @@ func (c *Comparator) compareSetHeaders(phase extproctorv1.ProcessingPhase, exp m
 		for _, h := range resp.HeaderMutation.SetHeaders {
 			if h.Header != nil && h.Header.Key == k {
 				found = true
-				if h.Header.Value != v {
+				actualValue := getHeaderValue(h.Header)
+				if actualValue != v {
 					diffs = append(diffs, Difference{
 						Phase:    phase,
 						Path:     fmt.Sprintf("set_headers[%s]", k),
 						Expected: v,
-						Actual:   h.Header.Value,
+						Actual:   actualValue,
 					})
 				}
 				break
@@ -364,30 +415,76 @@ func (c *Comparator) compareTrailersResponse(phase extproctorv1.ProcessingPhase,
 	}
 
 	// Compare set trailers
-	if len(exp.SetTrailers) > 0 && actual.HeaderMutation != nil {
-		for k, v := range exp.SetTrailers {
-			found := false
-			for _, h := range actual.HeaderMutation.SetHeaders {
-				if h.Header != nil && h.Header.Key == k {
-					found = true
-					if h.Header.Value != v {
-						diffs = append(diffs, Difference{
-							Phase:    phase,
-							Path:     fmt.Sprintf("set_trailers[%s]", k),
-							Expected: v,
-							Actual:   h.Header.Value,
-						})
-					}
-					break
-				}
-			}
-			if !found {
+	if len(exp.SetTrailers) > 0 {
+		if actual.HeaderMutation == nil {
+			// Expected trailers but no header mutation in response
+			for k, v := range exp.SetTrailers {
 				diffs = append(diffs, Difference{
 					Phase:    phase,
 					Path:     fmt.Sprintf("set_trailers[%s]", k),
 					Expected: v,
-					Actual:   "<not set>",
+					Actual:   "<no header mutation>",
 				})
+			}
+		} else {
+			for k, v := range exp.SetTrailers {
+				found := false
+				for _, h := range actual.HeaderMutation.SetHeaders {
+					if h.Header != nil && h.Header.Key == k {
+						found = true
+						actualValue := getHeaderValue(h.Header)
+						if actualValue != v {
+							diffs = append(diffs, Difference{
+								Phase:    phase,
+								Path:     fmt.Sprintf("set_trailers[%s]", k),
+								Expected: v,
+								Actual:   actualValue,
+							})
+						}
+						break
+					}
+				}
+				if !found {
+					diffs = append(diffs, Difference{
+						Phase:    phase,
+						Path:     fmt.Sprintf("set_trailers[%s]", k),
+						Expected: v,
+						Actual:   "<not set>",
+					})
+				}
+			}
+		}
+	}
+
+	// Compare remove trailers
+	if len(exp.RemoveTrailers) > 0 {
+		if actual.HeaderMutation == nil {
+			// Expected trailers to be removed but no header mutation in response
+			for _, k := range exp.RemoveTrailers {
+				diffs = append(diffs, Difference{
+					Phase:    phase,
+					Path:     fmt.Sprintf("remove_trailers[%s]", k),
+					Expected: "removed",
+					Actual:   "<no header mutation>",
+				})
+			}
+		} else {
+			for _, k := range exp.RemoveTrailers {
+				found := false
+				for _, h := range actual.HeaderMutation.RemoveHeaders {
+					if h == k {
+						found = true
+						break
+					}
+				}
+				if !found {
+					diffs = append(diffs, Difference{
+						Phase:    phase,
+						Path:     fmt.Sprintf("remove_trailers[%s]", k),
+						Expected: "removed",
+						Actual:   "<not removed>",
+					})
+				}
 			}
 		}
 	}
@@ -445,12 +542,13 @@ func (c *Comparator) compareImmediateResponse(phase extproctorv1.ProcessingPhase
 			for _, h := range actual.Headers.SetHeaders {
 				if h.Header != nil && h.Header.Key == k {
 					found = true
-					if h.Header.Value != v {
+					actualValue := getHeaderValue(h.Header)
+					if actualValue != v {
 						diffs = append(diffs, Difference{
 							Phase:    phase,
 							Path:     fmt.Sprintf("immediate_response.headers[%s]", k),
 							Expected: v,
-							Actual:   h.Header.Value,
+							Actual:   actualValue,
 						})
 					}
 					break
