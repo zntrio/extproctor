@@ -13,7 +13,6 @@ import (
 	typev3 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	extproctorv1 "zntr.io/extproctor/gen/extproctor/v1"
 	"zntr.io/extproctor/internal/client"
 )

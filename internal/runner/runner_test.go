@@ -11,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	extproctorv1 "zntr.io/extproctor/gen/extproctor/v1"
 	"zntr.io/extproctor/internal/comparator"
 	"zntr.io/extproctor/internal/reporter"

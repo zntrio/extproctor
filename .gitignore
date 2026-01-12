@@ -36,3 +36,4 @@ Thumbs.db
 # Project specific
 cmd/extproctor/extproctor
 sample/extproc/extproc-server
+extproctor

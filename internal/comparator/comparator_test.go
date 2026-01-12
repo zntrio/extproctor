@@ -10,7 +10,6 @@ import (
 	extprocv3 "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	typev3 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 	"github.com/stretchr/testify/assert"
-
 	extproctorv1 "zntr.io/extproctor/gen/extproctor/v1"
 	"zntr.io/extproctor/internal/client"
 )
@@ -1437,4 +1436,265 @@ func TestComparator_HeadersResponse_NilActual(t *testing.T) {
 	compResult := comp.Compare(expectations, result)
 	assert.False(t, compResult.Passed)
 	assert.NotEmpty(t, compResult.Differences)
+}
+
+func TestComparator_Compare_NoExpectationsWithResponses(t *testing.T) {
+	comp := New()
+
+	// No expectations defined
+	expectations := []*extproctorv1.ExtProcExpectation{}
+
+	// But there are responses
+	result := &client.ProcessingResult{
+		Responses: []*client.PhaseResponse{
+			{
+				Phase: extproctorv1.ProcessingPhase_REQUEST_HEADERS,
+				Response: &extprocv3.ProcessingResponse{
+					Response: &extprocv3.ProcessingResponse_RequestHeaders{
+						RequestHeaders: &extprocv3.HeadersResponse{},
+					},
+				},
+			},
+		},
+	}
+
+	compResult := comp.Compare(expectations, result)
+	assert.False(t, compResult.Passed, "Should fail when no expectations but responses exist")
+	assert.NotEmpty(t, compResult.Differences)
+	assert.Len(t, compResult.Unexpected, 1, "Should track unexpected responses")
+}
+
+func TestComparator_Compare_UnexpectedResponses(t *testing.T) {
+	comp := New()
+
+	expectations := []*extproctorv1.ExtProcExpectation{
+		{
+			Phase: extproctorv1.ProcessingPhase_REQUEST_HEADERS,
+			Response: &extproctorv1.ExtProcExpectation_HeadersResponse{
+				HeadersResponse: &extproctorv1.HeadersExpectation{},
+			},
+		},
+	}
+
+	// More responses than expectations
+	result := &client.ProcessingResult{
+		Responses: []*client.PhaseResponse{
+			{
+				Phase: extproctorv1.ProcessingPhase_REQUEST_HEADERS,
+				Response: &extprocv3.ProcessingResponse{
+					Response: &extprocv3.ProcessingResponse_RequestHeaders{
+						RequestHeaders: &extprocv3.HeadersResponse{},
+					},
+				},
+			},
+			{
+				Phase: extproctorv1.ProcessingPhase_REQUEST_BODY,
+				Response: &extprocv3.ProcessingResponse{
+					Response: &extprocv3.ProcessingResponse_RequestBody{
+						RequestBody: &extprocv3.BodyResponse{},
+					},
+				},
+			},
+		},
+	}
+
+	compResult := comp.Compare(expectations, result)
+	assert.True(t, compResult.Passed, "Should pass as all expectations are met")
+	assert.Len(t, compResult.Unexpected, 1, "Should track unexpected response")
+	assert.Equal(t, extproctorv1.ProcessingPhase_REQUEST_BODY, compResult.Unexpected[0].Phase)
+}
+
+func TestComparator_Compare_NoExpectationsNoResponses(t *testing.T) {
+	comp := New()
+
+	// No expectations
+	expectations := []*extproctorv1.ExtProcExpectation{}
+
+	// No responses
+	result := &client.ProcessingResult{
+		Responses: []*client.PhaseResponse{},
+	}
+
+	compResult := comp.Compare(expectations, result)
+	assert.True(t, compResult.Passed, "Should pass when no expectations and no responses")
+}
+
+func TestComparator_Compare_RawValueHeader(t *testing.T) {
+	comp := New()
+
+	expectations := []*extproctorv1.ExtProcExpectation{
+		{
+			Phase: extproctorv1.ProcessingPhase_REQUEST_HEADERS,
+			Response: &extproctorv1.ExtProcExpectation_HeadersResponse{
+				HeadersResponse: &extproctorv1.HeadersExpectation{
+					SetHeaders: map[string]string{
+						"x-binary-header": "binary-value",
+					},
+				},
+			},
+		},
+	}
+
+	// Response uses RawValue instead of Value
+	result := &client.ProcessingResult{
+		Responses: []*client.PhaseResponse{
+			{
+				Phase: extproctorv1.ProcessingPhase_REQUEST_HEADERS,
+				Response: &extprocv3.ProcessingResponse{
+					Response: &extprocv3.ProcessingResponse_RequestHeaders{
+						RequestHeaders: &extprocv3.HeadersResponse{
+							Response: &extprocv3.CommonResponse{
+								HeaderMutation: &extprocv3.HeaderMutation{
+									SetHeaders: []*corev3.HeaderValueOption{
+										{
+											Header: &corev3.HeaderValue{
+												Key:      "x-binary-header",
+												RawValue: []byte("binary-value"),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	compResult := comp.Compare(expectations, result)
+	assert.True(t, compResult.Passed, "Should match header with RawValue")
+}
+
+func TestComparator_Compare_RawValueHeader_Mismatch(t *testing.T) {
+	comp := New()
+
+	expectations := []*extproctorv1.ExtProcExpectation{
+		{
+			Phase: extproctorv1.ProcessingPhase_REQUEST_HEADERS,
+			Response: &extproctorv1.ExtProcExpectation_HeadersResponse{
+				HeadersResponse: &extproctorv1.HeadersExpectation{
+					SetHeaders: map[string]string{
+						"x-binary-header": "expected-value",
+					},
+				},
+			},
+		},
+	}
+
+	// Response uses RawValue with different value
+	result := &client.ProcessingResult{
+		Responses: []*client.PhaseResponse{
+			{
+				Phase: extproctorv1.ProcessingPhase_REQUEST_HEADERS,
+				Response: &extprocv3.ProcessingResponse{
+					Response: &extprocv3.ProcessingResponse_RequestHeaders{
+						RequestHeaders: &extprocv3.HeadersResponse{
+							Response: &extprocv3.CommonResponse{
+								HeaderMutation: &extprocv3.HeaderMutation{
+									SetHeaders: []*corev3.HeaderValueOption{
+										{
+											Header: &corev3.HeaderValue{
+												Key:      "x-binary-header",
+												RawValue: []byte("actual-value"),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	compResult := comp.Compare(expectations, result)
+	assert.False(t, compResult.Passed, "Should fail with mismatched RawValue")
+	assert.NotEmpty(t, compResult.Differences)
+}
+
+func TestComparator_Compare_TrailersResponse_NilHeaderMutation(t *testing.T) {
+	comp := New()
+
+	// Expectation: response trailers with set_trailers
+	expectations := []*extproctorv1.ExtProcExpectation{
+		{
+			Phase: extproctorv1.ProcessingPhase_RESPONSE_TRAILERS,
+			Response: &extproctorv1.ExtProcExpectation_TrailersResponse{
+				TrailersResponse: &extproctorv1.TrailersExpectation{
+					SetTrailers: map[string]string{
+						"grpc-status":  "8",
+						"grpc-message": "Resource exhausted",
+					},
+				},
+			},
+		},
+	}
+
+	// Response: trailers response with nil HeaderMutation (empty response)
+	result := &client.ProcessingResult{
+		Responses: []*client.PhaseResponse{
+			{
+				Phase: extproctorv1.ProcessingPhase_RESPONSE_TRAILERS,
+				Response: &extprocv3.ProcessingResponse{
+					Response: &extprocv3.ProcessingResponse_ResponseTrailers{
+						ResponseTrailers: &extprocv3.TrailersResponse{
+							// HeaderMutation is nil - this is the bug scenario
+						},
+					},
+				},
+			},
+		},
+	}
+
+	compResult := comp.Compare(expectations, result)
+	assert.False(t, compResult.Passed, "Should fail when expecting trailers but HeaderMutation is nil")
+	assert.NotEmpty(t, compResult.Differences)
+	// Verify we get differences for each expected trailer
+	assert.Len(t, compResult.Differences, 2)
+	for _, diff := range compResult.Differences {
+		assert.Equal(t, extproctorv1.ProcessingPhase_RESPONSE_TRAILERS, diff.Phase)
+		assert.Contains(t, diff.Path, "set_trailers[")
+		assert.Equal(t, "<no header mutation>", diff.Actual)
+	}
+}
+
+func TestComparator_Compare_TrailersResponse_RemoveTrailers_NilHeaderMutation(t *testing.T) {
+	comp := New()
+
+	// Expectation: response trailers with remove_trailers
+	expectations := []*extproctorv1.ExtProcExpectation{
+		{
+			Phase: extproctorv1.ProcessingPhase_RESPONSE_TRAILERS,
+			Response: &extproctorv1.ExtProcExpectation_TrailersResponse{
+				TrailersResponse: &extproctorv1.TrailersExpectation{
+					RemoveTrailers: []string{"x-custom-trailer"},
+				},
+			},
+		},
+	}
+
+	// Response: trailers response with nil HeaderMutation
+	result := &client.ProcessingResult{
+		Responses: []*client.PhaseResponse{
+			{
+				Phase: extproctorv1.ProcessingPhase_RESPONSE_TRAILERS,
+				Response: &extprocv3.ProcessingResponse{
+					Response: &extprocv3.ProcessingResponse_ResponseTrailers{
+						ResponseTrailers: &extprocv3.TrailersResponse{
+							// HeaderMutation is nil
+						},
+					},
+				},
+			},
+		},
+	}
+
+	compResult := comp.Compare(expectations, result)
+	assert.False(t, compResult.Passed, "Should fail when expecting remove_trailers but HeaderMutation is nil")
+	assert.NotEmpty(t, compResult.Differences)
+	assert.Len(t, compResult.Differences, 1)
+	assert.Equal(t, "remove_trailers[x-custom-trailer]", compResult.Differences[0].Path)
+	assert.Equal(t, "<no header mutation>", compResult.Differences[0].Actual)
 }

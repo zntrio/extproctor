@@ -1,0 +1,34 @@
+# Golden file for multi-phase-golden test
+#
+# This file captures expected responses for a complete request flow:
+# 1. REQUEST_HEADERS - ExtProc adds tracking header
+# 2. REQUEST_BODY - ExtProc processes the request body
+# 3. RESPONSE_HEADERS - ExtProc adds response metadata
+#
+# To regenerate: extproctor run testdata/examples/ --update-golden
+
+name: "golden"
+expectations: {
+  phase: REQUEST_HEADERS
+  headers_response: {
+    set_headers: {
+      key: "x-processed"
+      value: "true"
+    }
+  }
+}
+expectations: {
+  phase: REQUEST_BODY
+  body_response: {
+  }
+}
+expectations: {
+  phase: RESPONSE_HEADERS
+  headers_response: {
+    set_headers: {
+      key: "x-response-processed"
+      value: "true"
+    }
+  }
+}
+

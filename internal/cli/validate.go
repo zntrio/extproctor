@@ -8,7 +8,6 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-
 	"zntr.io/extproctor/internal/manifest"
 )
 

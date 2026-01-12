@@ -7,6 +7,7 @@ import (
 	"time"
 
 	extproctorv1 "zntr.io/extproctor/gen/extproctor/v1"
+	"zntr.io/extproctor/internal/client"
 	"zntr.io/extproctor/internal/comparator"
 )
 
@@ -34,6 +35,7 @@ type TestResult struct {
 	Error       error
 	Differences []comparator.Difference
 	Unmatched   []*extproctorv1.ExtProcExpectation
+	Unexpected  []*client.PhaseResponse
 }
 
 // SuiteSummary contains the summary of the entire test suite.

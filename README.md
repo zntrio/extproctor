@@ -4,7 +4,7 @@
 
 **A test runner for Envoy ExtProc implementations**
 
-[![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/zntr.io/extproctor)](https://goreportcard.com/report/zntr.io/extproctor)
 [![Documentation](https://img.shields.io/badge/docs-reference-blue)](https://pkg.go.dev/zntr.io/extproctor)
@@ -169,7 +169,30 @@ extproctor validate ./tests/
 extproctor validate test1.textproto test2.textproto
 ```
 
+#### `extproctor fmt`
+
+Format textproto manifest files using [txtpbfmt](https://github.com/protocolbuffers/txtpbfmt).
+
+```bash
+# Format a single file to stdout
+extproctor fmt test.textproto
+
+# Format files in-place
+extproctor fmt --write ./tests/
+
+# Show diff of what would change
+extproctor fmt --diff ./tests/
+
+# Format specific files in-place
+extproctor fmt -w test1.textproto test2.textproto
+
+# CI check - returns error if files need formatting
+extproctor fmt ./tests/
+```
+
 ### Command-Line Options
+
+#### Run Command Options
 
 | Flag | Description | Default |
 |------|-------------|---------|
@@ -187,6 +210,13 @@ extproctor validate test1.textproto test2.textproto
 | `--update-golden` | Update golden files with actual responses | `false` |
 
 > **Note:** `--target` and `--unix-socket` are mutually exclusive.
+
+#### Fmt Command Options
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-w, --write` | Write formatted output back to files (in-place) | `false` |
+| `-d, --diff` | Show diff of what would change | `false` |
 
 ### Manifest Format
 
@@ -368,7 +398,7 @@ The sample server demonstrates:
 
 ### Prerequisites
 
-- [Go 1.23+](https://go.dev/dl/)
+- [Go 1.24+](https://go.dev/dl/)
 - [Buf CLI](https://buf.build/docs/installation) (for protobuf generation)
 
 ### Building

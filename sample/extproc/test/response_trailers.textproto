@@ -1,0 +1,199 @@
+# Response Trailers Processing Tests
+#
+# Tests that the ExtProc service correctly handles response trailers.
+# Response trailers are typically used for gRPC status codes, checksums,
+# or other metadata that can only be determined after the body is sent.
+
+name: "response-trailers"
+description: "Test response trailers processing in the sample ExtProc"
+
+test_cases: {
+  name: "response-trailers-basic"
+  description: "Verify response trailers are processed and modified"
+  tags: ["trailers", "response", "smoke"]
+
+  request: {
+    method: "POST"
+    path: "/api/v1/stream"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "content-type"
+      value: "application/grpc"
+    }
+    headers: {
+      key: "te"
+      value: "trailers"
+    }
+    body: '{"stream": true}'
+    process_response_trailers: true
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-extproc-processed"
+        value: "true"
+      }
+    }
+  }
+
+  expectations: {
+    phase: RESPONSE_TRAILERS
+    trailers_response: {
+      set_trailers: {
+        key: "x-extproc-trailer"
+        value: "processed"
+      }
+    }
+  }
+}
+
+test_cases: {
+  name: "grpc-response-trailers"
+  description: "Verify gRPC-style response trailers processing"
+  tags: ["trailers", "response", "grpc"]
+
+  request: {
+    method: "POST"
+    path: "/grpc.service/Method"
+    scheme: "https"
+    authority: "grpc.example.com"
+    headers: {
+      key: "content-type"
+      value: "application/grpc+proto"
+    }
+    headers: {
+      key: "te"
+      value: "trailers"
+    }
+    headers: {
+      key: "grpc-encoding"
+      value: "identity"
+    }
+    process_response_trailers: true
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-extproc-processed"
+        value: "true"
+      }
+    }
+  }
+
+  expectations: {
+    phase: RESPONSE_TRAILERS
+    trailers_response: {
+      set_trailers: {
+        key: "x-extproc-trailer"
+        value: "processed"
+      }
+    }
+  }
+}
+
+test_cases: {
+  name: "response-trailers-with-checksum"
+  description: "Simulate checksum trailer handling for chunked responses"
+  tags: ["trailers", "response", "checksum"]
+
+  request: {
+    method: "GET"
+    path: "/api/v1/download/large-file"
+    scheme: "https"
+    authority: "files.example.com"
+    headers: {
+      key: "accept"
+      value: "application/octet-stream"
+    }
+    headers: {
+      key: "te"
+      value: "trailers"
+    }
+    process_response_trailers: true
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-extproc-processed"
+        value: "true"
+      }
+    }
+  }
+
+  expectations: {
+    phase: RESPONSE_TRAILERS
+    trailers_response: {
+      set_trailers: {
+        key: "x-extproc-trailer"
+        value: "processed"
+      }
+    }
+  }
+}
+
+test_cases: {
+  name: "response-trailers-full-pipeline"
+  description: "Complete request with response body and trailers processing"
+  tags: ["trailers", "response", "integration"]
+
+  request: {
+    method: "POST"
+    path: "/api/v1/process-with-trailers"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "content-type"
+      value: "application/json"
+    }
+    headers: {
+      key: "te"
+      value: "trailers"
+    }
+    headers: {
+      key: "x-request-id"
+      value: "req-trailer-001"
+    }
+    body: '{"action": "process", "include_trailers": true}'
+    process_request_body: true
+    process_response_headers: true
+    process_response_body: true
+    process_response_trailers: true
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-extproc-processed"
+        value: "true"
+      }
+    }
+  }
+
+  expectations: {
+    phase: REQUEST_BODY
+    body_response: {
+      common_response: {
+        status: CONTINUE
+      }
+    }
+  }
+
+  expectations: {
+    phase: RESPONSE_TRAILERS
+    trailers_response: {
+      set_trailers: {
+        key: "x-extproc-trailer"
+        value: "processed"
+      }
+    }
+  }
+}
+

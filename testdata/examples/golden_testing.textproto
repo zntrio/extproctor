@@ -1,0 +1,101 @@
+# Golden Testing Pattern Example
+#
+# This example demonstrates how to use golden files for ExtProc testing.
+# Golden files are useful when:
+#
+# 1. You want to capture actual server behavior as the source of truth
+# 2. Expectations are complex or frequently changing
+# 3. You prefer to manage expectations separately from test definitions
+#
+# Workflow:
+# ---------
+# 1. Write test cases without expectations (or with golden_file references)
+# 2. Run: extproctor run tests/ --target localhost:50051 --update-golden
+# 3. Review generated golden files
+# 4. Commit both test manifests and golden files to version control
+#
+# When the ExtProc behavior changes:
+# 1. Run tests - they will fail showing the diff
+# 2. Review the changes
+# 3. If changes are expected, run --update-golden to update golden files
+
+name: "golden-testing-example"
+description: "Example demonstrating golden file testing patterns"
+
+# Example 1: Simple golden file reference
+# ---------------------------------------
+# The golden file contains the expected ExtProc response.
+# Path is relative to the manifest file location.
+test_cases: {
+  name: "api-request-with-golden"
+  description: "API request validated against golden file"
+  tags: ["golden", "example"]
+
+  request: {
+    method: "GET"
+    path: "/api/v1/resources"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "authorization"
+      value: "Bearer token123"
+    }
+  }
+
+  # Reference to golden file (relative path from manifest)
+  golden_file: "golden/api_request.golden"
+}
+
+# Example 2: Golden file for multi-phase processing
+# -------------------------------------------------
+# Golden files are especially useful for multi-phase tests
+# where you want to capture the complete sequence of responses.
+test_cases: {
+  name: "multi-phase-golden"
+  description: "Multi-phase test with golden expectations"
+  tags: ["golden", "integration", "example"]
+
+  request: {
+    method: "POST"
+    path: "/api/v1/transform"
+    scheme: "https"
+    authority: "api.example.com"
+    headers: {
+      key: "content-type"
+      value: "application/json"
+    }
+    body: '{"input": "data", "transform": "uppercase"}'
+    process_request_body: true
+    process_response_headers: true
+  }
+
+  golden_file: "golden/multi_phase.golden"
+}
+
+# Example 3: Inline expectations (for comparison)
+# -----------------------------------------------
+# You can still use inline expectations when golden files are overkill.
+# This is useful for simple, stable expectations.
+test_cases: {
+  name: "simple-inline-expectations"
+  description: "Simple test with inline expectations"
+  tags: ["example", "inline"]
+
+  request: {
+    method: "GET"
+    path: "/health"
+    scheme: "https"
+    authority: "api.example.com"
+  }
+
+  expectations: {
+    phase: REQUEST_HEADERS
+    headers_response: {
+      set_headers: {
+        key: "x-processed"
+        value: "true"
+      }
+    }
+  }
+}
+

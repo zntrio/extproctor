@@ -11,7 +11,6 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-
 	"zntr.io/extproctor/internal/client"
 	"zntr.io/extproctor/internal/manifest"
 	"zntr.io/extproctor/internal/reporter"

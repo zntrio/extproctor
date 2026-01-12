@@ -45,7 +45,7 @@ func TestRunTests_NoManifests(t *testing.T) {
 
 	// Override global flags for this test
 	oldTarget := target
-	target = "localhost:50051"
+	target = "localhost:59999"
 	defer func() { target = oldTarget }()
 
 	cmd := &cobra.Command{}
@@ -58,7 +58,7 @@ func TestRunTests_NoManifests(t *testing.T) {
 func TestRunTests_InvalidPath(t *testing.T) {
 	// Override global flags for this test
 	oldTarget := target
-	target = "localhost:50051"
+	target = "localhost:59999"
 	defer func() { target = oldTarget }()
 
 	cmd := &cobra.Command{}
@@ -89,7 +89,7 @@ test_cases: {
 	oldVerbose := verbose
 	oldParallel := parallel
 
-	target = "localhost:50051"
+	target = "localhost:59999"
 	output = "human"
 	verbose = false
 	parallel = 1
@@ -129,7 +129,7 @@ test_cases: {
 	oldTarget := target
 	oldOutput := output
 
-	target = "localhost:50051"
+	target = "localhost:59999"
 	output = "json"
 
 	defer func() {
@@ -163,7 +163,7 @@ test_cases: {
 	oldTarget := target
 	oldFilter := filter
 
-	target = "localhost:50051"
+	target = "localhost:59999"
 	filter = "test-*"
 
 	defer func() {
@@ -197,7 +197,7 @@ test_cases: {
 	oldTarget := target
 	oldTags := tags
 
-	target = "localhost:50051"
+	target = "localhost:59999"
 	tags = []string{"smoke"}
 
 	defer func() {
@@ -230,7 +230,7 @@ test_cases: {
 	oldTarget := target
 	oldUpdateGolden := updateGolden
 
-	target = "localhost:50051"
+	target = "localhost:59999"
 	updateGolden = true
 
 	defer func() {
@@ -296,7 +296,7 @@ test_cases: {
 	oldTLSKey := tlsKey
 	oldTLSCA := tlsCA
 
-	target = "localhost:50051"
+	target = "localhost:59999"
 	tlsEnable = true
 	tlsCert = ""
 	tlsKey = ""
@@ -335,7 +335,7 @@ test_cases: {
 	oldTarget := target
 	oldParallel := parallel
 
-	target = "localhost:50051"
+	target = "localhost:59999"
 	parallel = 4
 
 	defer func() {
@@ -368,7 +368,7 @@ test_cases: {
 	oldTarget := target
 	oldVerbose := verbose
 
-	target = "localhost:50051"
+	target = "localhost:59999"
 	verbose = true
 
 	defer func() {
